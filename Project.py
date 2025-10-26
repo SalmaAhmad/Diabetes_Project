@@ -12,7 +12,7 @@ MIN_SUPPORT = 0.15
 MIN_CONFIDENCE = 0.6
 
 
-df=pd.read_csv("Diabetes_Project\Dataset_Diabetes.csv")
+df=pd.read_csv("Dataset_Diabetes.csv")
 
 #Step 1: Understanding the dataset
 #print(df.head())
