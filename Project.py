@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import LabelEncoder, minmax_scale
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.impute import SimpleImputer
 import matplotlib.pyplot as plt
 import seaborn as sns
 from apyori import apriori
@@ -69,7 +70,51 @@ df[num_col].boxplot(figsize=(12,6))
 plt.xticks(rotation=45)
 plt.show()
 
-df_cleaned = df[~outlier_mask.any(axis=1)]
+#df_cleaned = df[~outlier_mask.any(axis=1)]
+
+#mask outlier cells with NaN
+df_masked = df.copy()
+df_masked.loc[:, num_col] = df_masked.loc[:, num_col].astype('float64')
+df_masked.loc[:, num_col] = df_masked.loc[:, num_col].mask(outlier_mask)
+
+#impute missing values (from outlier masking) with median
+imputer = SimpleImputer(strategy='median')
+imputed_values = imputer.fit_transform(df_masked[num_col])
+
+df_cleaned = df_masked.copy()
+df_cleaned.loc[:, num_col] = imputed_values
+
+
+#######################################EVALUTAING OUTLIER MASKING AND IMPUTATION#######################################
+
+#how many outliers were there
+total_outliers = outlier_mask.sum().sum()
+print(f"\nTotal outlier cells detected: {total_outliers}")
+print(outlier_mask.sum().sort_values(ascending=False))
+
+
+#how many NaNs introduced before imputation
+print("\nNaNs introduced (before imputation):")
+print(df_masked[num_col].isna().sum().sort_values(ascending=False))
+
+#Check that imputation removed all NaNs
+print("\nRemaining NaNs after imputation (should be 0):")
+print(df_cleaned[num_col].isna().sum().sum())
+
+# Check medians didn’t shift wildly
+print(pd.DataFrame({
+    'Median_before': df[num_col].median().round(3),
+    'Median_after' : df_cleaned[num_col].median().round(3)
+}))
+
+#check means didn’t shift wildly
+print(pd.DataFrame({
+    'Mean_before': df[num_col].mean().round(3),
+    'Mean_after' : df_cleaned[num_col].mean().round(3)
+}))
+
+
+#######################################EVALUTAING OUTLIER MASKING AND IMPUTATION#######################################
 
 #visualizing after removing outliers
 df_cleaned.boxplot(figsize=(12,6))
