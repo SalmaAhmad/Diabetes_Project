@@ -56,17 +56,24 @@ outlier_mask = (df[num_col] < (q1 - 1.5 * iqr)) | (df[num_col] > (q3 + 1.5 * iqr
 outlier_counts = outlier_mask.sum()
 print(outlier_counts)
 
+# Get global min and max from the original (before cleaning) DataFrame
+ymin = df[num_col].min().min() -5
+ymax = df[num_col].max().max() + 5
 
 #visualizing the outliers
 df[num_col].boxplot(figsize=(12,6))
 plt.xticks(rotation=45)
+plt.title("Before Outlier Removal")
+plt.ylim(ymin, ymax)  # fix y scale
 plt.show()
 
 df_cleaned = df[~outlier_mask.any(axis=1)]
 
 #visualizing after removing outliers
-df_cleaned.boxplot(figsize=(12,6))
+df_cleaned[num_col].boxplot(figsize=(12,6))
 plt.xticks(rotation=45)
+plt.title("After Outlier Removal")
+plt.ylim(ymin, ymax)  # same y scale as before
 plt.show()
 
 #now scaling
