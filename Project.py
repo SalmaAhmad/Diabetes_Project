@@ -10,7 +10,7 @@ import pyfpgrowth
 
 
 
-df=pd.read_csv("Diabetes_Project\Dataset_Diabetes.csv")
+df=pd.read_csv("Dataset_Diabetes.csv")
 
 #Step 1: Understanding the dataset
 #print(df.head())
@@ -42,8 +42,8 @@ for col in cat_col:
 gender_encoder= LabelEncoder()
 df['Gender_encoded']=gender_encoder.fit_transform(df['Gender'])
 #One hot encode Class
-df=pd.get_dummies(df,columns=['CLASS'],prefix='Class',dtype=int)
-
+df['CLASS_original'] = df['CLASS']  # Save before one-hot encoding
+df = pd.get_dummies(df, columns=['CLASS'], prefix='Class', dtype=int)
 
 #print(df)
 
@@ -63,8 +63,18 @@ print(outlier_counts)
 
 
 #visualizing the outliers
-df[num_col].boxplot(figsize=(12,6))
+
+# Get global min and max from the original (before cleaning) DataFrame
+ymin = df[num_col].min().min() -5
+ymax = df[num_col].max().max() + 5
+
+# --- Before removing outliers ---
+plt.figure(figsize=(12,6))
+df[num_col].boxplot()
+plt.title("Before Outlier Removal")
+plt.ylim(ymin, ymax)  # fix y scale
 plt.xticks(rotation=45)
+plt.savefig("visualization/Boxplot_before_outlier_removal.png", dpi=300, bbox_inches='tight')
 plt.show()
 
 #df_cleaned = df[~outlier_mask.any(axis=1)]
@@ -113,10 +123,108 @@ print(pd.DataFrame({
 
 #######################################EVALUTAING OUTLIER MASKING AND IMPUTATION#######################################
 
-#visualizing after removing outliers
-df_cleaned.boxplot(figsize=(12,6))
-plt.xticks(rotation=45)
+
+#######################################Scatter plots before removing outliers#######################################
+plt.figure(figsize=(10, 5))
+for dclass, color, marker in zip(['N', 'P', 'Y'], ['blue', 'orange', 'red'], ['o', 's', '^']):
+    subset = df[df['CLASS_original'] == dclass]
+    plt.scatter(subset['AGE'], subset['BMI'],
+                alpha=0.6, c=color, label=f'Class {dclass}', marker=marker, s=50)
+
+plt.xlabel('Age', fontsize=12)
+plt.ylabel('BMI', fontsize=12)
+plt.title('Age vs BMI before removing outliers', fontsize=14, fontweight='bold')
+plt.legend()
+plt.grid(alpha=0.3)
+
+plt.savefig("visualization/Age_vs_BMI_before_outliers.png", dpi=300, bbox_inches='tight')
 plt.show()
+
+
+plt.figure(figsize=(10, 6))
+for dclass, color, marker in zip(['N', 'P', 'Y'], ['blue', 'orange', 'red'], ['o', 's', '^']):
+    subset = df[df['CLASS_original'] == dclass]
+    plt.scatter(subset['BMI'], subset['HbA1c'],
+                alpha=0.6, c=color, label=f'Class {dclass}', marker=marker, s=50)
+
+plt.xlabel('BMI', fontsize=12)
+plt.ylabel('HbA1c', fontsize=12)
+plt.title('BMI vs HbA1c before removing outliers', fontsize=14, fontweight='bold')
+plt.legend()
+plt.grid(alpha=0.3)
+
+plt.savefig("visualization/BMI_vs_HbA1c_before_outliers.png", dpi=300, bbox_inches='tight')
+plt.show()
+
+
+#from the plot we can see that the Y class (diabetes= yes) often has BMI>25 and Age>50
+
+#######################################Scatter plots before removing outliers#######################################
+
+
+#######################################Scatter plots after removing outliers#######################################
+
+#visualizing after removing outliers
+plt.figure(figsize=(12,6))
+df_cleaned[num_col].boxplot()
+plt.title("Boxplot After Outlier Imputation (Before Scaling)")
+plt.ylim(ymin, ymax)  # same y scale as 'before'
+plt.xticks(rotation=45)
+plt.savefig("visualization/Boxplot_after_outlier_imputation.png", dpi=300, bbox_inches='tight')
+plt.show()
+
+# Subplots for each numeric column
+df_cleaned[num_col].plot.box(
+    subplots=True,
+    layout=(2, 5),          # 2 rows x 5 columns grid
+    figsize=(14, 6),
+    sharey=False,
+    title='Boxplots After Outlier Imputation (Per Feature)'
+)
+plt.tight_layout()
+plt.savefig("visualization/Boxplot_after_outlier_imputation_subplots.png", dpi=300, bbox_inches='tight')
+plt.show()
+
+
+#Scatter plots after removing outliers
+# Age vs BMI
+plt.figure(figsize=(10, 5))
+for dclass, color, marker in zip(['N', 'P', 'Y'], ['blue', 'orange', 'red'], ['o', 's', '^']):
+    subset = df_cleaned[df_cleaned['CLASS_original'] == dclass]
+    plt.scatter(subset['AGE'], subset['BMI'], 
+                alpha=0.6,           # Transparency (0-1) to see overlapping points
+                c=color,             # Color for this class
+                label=f'Class {dclass}',
+                marker=marker,       # Different shapes for each class
+                s=50)               # Size of markers
+
+plt.xlabel('Age', fontsize=12)
+plt.ylabel('BMI', fontsize=12)
+plt.title('Age vs BMI after removing outliers', fontsize=14, fontweight='bold')
+plt.legend()
+plt.grid(alpha=0.3)  # Light grid
+plt.savefig("visualization/Age_vs_BMI_after_outliers.png", dpi=300, bbox_inches='tight')
+plt.show()
+
+# Age vs HbA1c
+plt.figure(figsize=(10, 6))
+for dclass, color, marker in zip(['N', 'P', 'Y'], ['blue', 'orange', 'red'], ['o', 's', '^']):
+    subset = df_cleaned[df_cleaned['CLASS_original'] == dclass]
+    plt.scatter(subset['BMI'], subset['HbA1c'], 
+                alpha=0.6, c=color, label=f'Class {dclass}', 
+                marker=marker, s=50)
+
+plt.xlabel('BMI', fontsize=12)
+plt.ylabel('HbA1c', fontsize=12)
+plt.title('BMI vs HbA1c after removing outliers', fontsize=14, fontweight='bold')
+plt.legend()
+plt.grid(alpha=0.3)
+plt.savefig("visualization/BMI_vs_HbA1c_after_outliers.png", dpi=300, bbox_inches='tight')
+plt.show()
+
+#from the plot we can see that the Y class (diabetes= yes) often has BMI>25 and Age>50
+
+#######################################Scatter plots after removing outliers#######################################
 
 #now scaling
 scaler=MinMaxScaler()
@@ -125,10 +233,11 @@ df_cleaned[num_col].describe()
 
 df_cleaned[num_col].hist(bins=20, figsize=(15,10))
 plt.suptitle("Histogram of Scaled Features")
+plt.savefig("visualization/Histogram_scaled_features.png", dpi=300, bbox_inches='tight')
 plt.show()
 
 plt.figure(figsize=(12,8))
 sns.heatmap(df_cleaned[num_col].corr(method='spearman'), annot=True, cmap='coolwarm')
 plt.title("Correlation Heatmap of Scaled Features")
+plt.savefig("visualization/Correlation_heatmap_scaled_features.png", dpi=300, bbox_inches='tight')
 plt.show()
-
