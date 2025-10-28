@@ -9,12 +9,11 @@ from apyori import apriori
 import pyfpgrowth
 
 
-
-df=pd.read_csv("Diabetes_Project\Dataset_Diabetes.csv")
+df=pd.read_csv("Dataset_Diabetes.csv")
 
 #Step 1: Understanding the dataset
 #print(df.head())
-print(df.info())
+print(df.info()) 
 #print(df.describe())
 
 #Step2: Null
@@ -82,6 +81,38 @@ df_cleaned = df_masked.copy()
 df_cleaned.loc[:, num_col] = imputed_values
 
 
+#######################################
+# 🔹 BINNING / DISCRETIZATION OF AGE FEATURE
+#######################################
+
+# Define bins and labels
+bins = [0, 13, 20, 60, 90]  # Child: 0–12, Teenager: 13–19, Adult: 20–59, Senior: 60–89
+labels = ['Child', 'Teenager', 'Adult', 'Senior']
+
+# Apply binning on the original AGE column
+df_cleaned['Age_bin'] = pd.cut(df_cleaned['AGE'], bins=bins, labels=labels, right=False)
+
+# BMI Binning
+bmi_bins = [0, 18.5, 25, 30, 100]
+bmi_labels = ['Underweight', 'Normal', 'Overweight', 'Obese']
+df_cleaned['BMI_bin'] = pd.cut(df_cleaned['BMI'], bins=bmi_bins, labels=bmi_labels, right=False)
+
+# More appropriate HbA1c bins for your data range
+hba1c_bins = [0, 4.0, 5.7, 6.4, 100]
+hba1c_labels = ['Very Low', 'Normal', 'Prediabetes', 'Diabetes']
+df_cleaned['HbA1c_bin'] = pd.cut(df_cleaned['HbA1c'], bins=hba1c_bins, labels=hba1c_labels, right=False)
+
+# Show a sample of results
+print("\nSample of Age Binning (before outlier detection):")
+print(df_cleaned[['AGE', 'Age_bin']].head(30))
+
+# Visualize the distribution of Age bins
+df_cleaned['Age_bin'].value_counts().plot(kind='bar', color='skyblue', figsize=(7, 4))
+plt.title("Distribution of Age Groups (Child, Teenager, Adult, Senior)")
+plt.xlabel("Age Group")
+plt.ylabel("Count")
+plt.show()
+
 #######################################EVALUTAING OUTLIER MASKING AND IMPUTATION#######################################
 
 #how many outliers were there
@@ -131,4 +162,3 @@ plt.figure(figsize=(12,8))
 sns.heatmap(df_cleaned[num_col].corr(method='spearman'), annot=True, cmap='coolwarm')
 plt.title("Correlation Heatmap of Scaled Features")
 plt.show()
-
