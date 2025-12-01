@@ -5,15 +5,16 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.impute import SimpleImputer
 import matplotlib.pyplot as plt
 import seaborn as sns
-from apyori import apriori
-import pyfpgrowth
+from sklearn.model_selection import train_test_split
+
 
 
 df=pd.read_csv("Dataset_Diabetes.csv")
 
+
 #Step 1: Understanding the dataset
 #print(df.head())
-print(df.info()) 
+print(df.info())
 #print(df.describe())
 
 #Step2: Null
@@ -41,7 +42,8 @@ for col in cat_col:
 gender_encoder= LabelEncoder()
 df['Gender_encoded']=gender_encoder.fit_transform(df['Gender'])
 #One hot encode Class
-df=pd.get_dummies(df,columns=['CLASS'],prefix='Class',dtype=int)
+df['CLASS_original'] = df['CLASS']  # Save before one-hot encoding
+df = pd.get_dummies(df, columns=['CLASS'], prefix='Class', dtype=int)
 
 
 #print(df)
@@ -62,7 +64,16 @@ print(outlier_counts)
 
 
 #visualizing the outliers
-df[num_col].boxplot(figsize=(12,6))
+
+# Get global min and max from the original (before cleaning) DataFrame
+ymin = df[num_col].min().min() -5
+ymax = df[num_col].max().max() + 5
+
+# --- Before removing outliers ---
+plt.figure(figsize=(12,6))
+df[num_col].boxplot()
+plt.title("Before Outlier Removal")
+plt.ylim(ymin, ymax)  # fix y scale
 plt.xticks(rotation=45)
 plt.show()
 
@@ -85,34 +96,54 @@ df_cleaned.loc[:, num_col] = imputed_values
 # 🔹 BINNING / DISCRETIZATION OF AGE FEATURE
 #######################################
 
-# Define bins and labels
-age_bins = [0, 13, 20, 60, 90]  # Child: 0–12, Teenager: 13–19, Adult: 20–59, Senior: 60–89
-labels = ['Child', 'Teenager', 'Adult', 'Senior']
+# Set K value (number of equal-width bins)
+K = 5
 
-# Apply binning on the original AGE column
-df_cleaned['Age_bin'] = pd.cut(df_cleaned['AGE'], bins=age_bins, labels=labels, right=False)
+# Get min and max age
+min_age = df_cleaned['AGE'].min()
+max_age = df_cleaned['AGE'].max()
 
-# BMI Binning
-bmi_bins = [0, 18.5, 25, 30, 100]
-bmi_labels = ['Underweight', 'Normal', 'Overweight', 'Obese']
-df_cleaned['BMI_bin'] = pd.cut(df_cleaned['BMI'], bins=bmi_bins, labels=bmi_labels, right=False)
+# Calculate bin width for equal-width bins
+bin_width = (max_age - min_age) / K
 
-# More appropriate HbA1c bins for your data range
-hba1c_bins = [0, 4.0, 5.7, 6.4, 100]
-hba1c_labels = ['Very Low', 'Normal', 'Prediabetes', 'Diabetes']
-df_cleaned['HbA1c_bin'] = pd.cut(df_cleaned['HbA1c'], bins=hba1c_bins, labels=hba1c_labels, right=False)
+# Create bin edges
+bin_edges = [min_age + i * bin_width for i in range(K + 1)]
+bin_edges[-1] = max_age + 0.001  # Ensure max value is included
 
-# Show a sample of results
-print("\nSample of Age Binning (before outlier detection):")
-print(df_cleaned[['AGE', 'Age_bin']].head(30))
+# Create labels for the bins
+age_labels = [f'{int(bin_edges[i])}-{int(bin_edges[i+1]-1)}' for i in range(K)]
+
+# Apply K-bin discretization
+df_cleaned['Age_Kbins'] = pd.cut(df_cleaned['AGE'],
+                                  bins=bin_edges,
+                                  labels=age_labels,
+                                  right=False)
+
+# Keep your other binning as is
+#bmi_bins = [0, 18.5, 25, 30, 100]
+#bmi_labels = ['Underweight', 'Normal', 'Overweight', 'Obese']
+#df_cleaned['BMI_bin'] = pd.cut(df_cleaned['BMI'], bins=bmi_bins, labels=bmi_labels, right=False)
+
+#hba1c_bins = [0, 4.0, 5.7, 6.4, 100]
+#hba1c_labels = ['Very Low', 'Normal', 'Prediabetes', 'Diabetes']
+#df_cleaned['HbA1c_bin'] = pd.cut(df_cleaned['HbA1c'], bins=hba1c_bins, labels=hba1c_labels, right=False)
+
+# Show results
+print(f"\nK={K} Equal-Width Age Binning:")
+print(f"Age range: {min_age} to {max_age}")
+print(f"Bin width: {bin_width:.2f}")
+print(f"Bin edges: {[f'{edge:.1f}' for edge in bin_edges]}")
+print(f"Bin labels: {age_labels}")
+print("\nSample of Age Binning:")
+print(df_cleaned[['AGE', 'Age_Kbins']].head(30))
 
 # Visualize the distribution of Age bins
-df_cleaned['Age_bin'].value_counts().plot(kind='bar', color='skyblue', figsize=(7, 4))
-plt.title("Distribution of Age Groups (Child, Teenager, Adult, Senior)")
+df_cleaned['Age_Kbins'].value_counts().sort_index().plot(kind='bar', color='skyblue', figsize=(7, 4))
+plt.title(f"Distribution of Age Groups (K={K} Equal-Width Bins)")
 plt.xlabel("Age Group")
 plt.ylabel("Count")
+plt.xticks(rotation=45)
 plt.show()
-
 #######################################EVALUTAING OUTLIER MASKING AND IMPUTATION#######################################
 
 #how many outliers were there
@@ -144,10 +175,108 @@ print(pd.DataFrame({
 
 #######################################EVALUTAING OUTLIER MASKING AND IMPUTATION#######################################
 
-#visualizing after removing outliers
-df_cleaned.boxplot(figsize=(12,6))
-plt.xticks(rotation=45)
+
+#######################################Scatter plots before removing outliers#######################################
+plt.figure(figsize=(10, 5))
+for dclass, color, marker in zip(['N', 'P', 'Y'], ['blue', 'orange', 'red'], ['o', 's', '^']):
+    subset = df[df['CLASS_original'] == dclass]
+    plt.scatter(subset['AGE'], subset['BMI'],
+                alpha=0.6, c=color, label=f'Class {dclass}', marker=marker, s=50)
+
+plt.xlabel('Age', fontsize=12)
+plt.ylabel('BMI', fontsize=12)
+plt.title('Age vs BMI before removing outliers', fontsize=14, fontweight='bold')
+plt.legend()
+plt.grid(alpha=0.3)
+
+plt.savefig("visualization/Age_vs_BMI_before_outliers.png", dpi=300, bbox_inches='tight')
 plt.show()
+
+
+plt.figure(figsize=(10, 6))
+for dclass, color, marker in zip(['N', 'P', 'Y'], ['blue', 'orange', 'red'], ['o', 's', '^']):
+    subset = df[df['CLASS_original'] == dclass]
+    plt.scatter(subset['BMI'], subset['HbA1c'],
+                alpha=0.6, c=color, label=f'Class {dclass}', marker=marker, s=50)
+
+plt.xlabel('BMI', fontsize=12)
+plt.ylabel('HbA1c', fontsize=12)
+plt.title('BMI vs HbA1c before removing outliers', fontsize=14, fontweight='bold')
+plt.legend()
+plt.grid(alpha=0.3)
+
+plt.savefig("visualization/BMI_vs_HbA1c_before_outliers.png", dpi=300, bbox_inches='tight')
+plt.show()
+
+
+#from the plot we can see that the Y class (diabetes= yes) often has BMI>25 and Age>50
+
+#######################################Scatter plots before removing outliers#######################################
+
+
+#######################################Scatter plots after removing outliers#######################################
+
+#visualizing after removing outliers
+plt.figure(figsize=(12,6))
+df_cleaned[num_col].boxplot()
+plt.title("Boxplot After Outlier Imputation (Before Scaling)")
+plt.ylim(ymin, ymax)  # same y scale as 'before'
+plt.xticks(rotation=45)
+plt.savefig("visualization/Boxplot_after_outlier_imputation.png", dpi=300, bbox_inches='tight')
+plt.show()
+
+# Subplots for each numeric column
+df_cleaned[num_col].plot.box(
+    subplots=True,
+    layout=(2, 5),          # 2 rows x 5 columns grid
+    figsize=(14, 6),
+    sharey=False,
+    title='Boxplots After Outlier Imputation (Per Feature)'
+)
+plt.tight_layout()
+plt.savefig("visualization/Boxplot_after_outlier_imputation_subplots.png", dpi=300, bbox_inches='tight')
+plt.show()
+
+
+#Scatter plots after removing outliers
+# Age vs BMI
+plt.figure(figsize=(10, 5))
+for dclass, color, marker in zip(['N', 'P', 'Y'], ['blue', 'orange', 'red'], ['o', 's', '^']):
+    subset = df_cleaned[df_cleaned['CLASS_original'] == dclass]
+    plt.scatter(subset['AGE'], subset['BMI'],
+                alpha=0.6,           # Transparency (0-1) to see overlapping points
+                c=color,             # Color for this class
+                label=f'Class {dclass}',
+                marker=marker,       # Different shapes for each class
+                s=50)               # Size of markers
+
+plt.xlabel('Age', fontsize=12)
+plt.ylabel('BMI', fontsize=12)
+plt.title('Age vs BMI after removing outliers', fontsize=14, fontweight='bold')
+plt.legend()
+plt.grid(alpha=0.3)  # Light grid
+plt.savefig("visualization/Age_vs_BMI_after_outliers.png", dpi=300, bbox_inches='tight')
+plt.show()
+
+# Age vs HbA1c
+plt.figure(figsize=(10, 6))
+for dclass, color, marker in zip(['N', 'P', 'Y'], ['blue', 'orange', 'red'], ['o', 's', '^']):
+    subset = df_cleaned[df_cleaned['CLASS_original'] == dclass]
+    plt.scatter(subset['BMI'], subset['HbA1c'],
+                alpha=0.6, c=color, label=f'Class {dclass}',
+                marker=marker, s=50)
+
+plt.xlabel('BMI', fontsize=12)
+plt.ylabel('HbA1c', fontsize=12)
+plt.title('BMI vs HbA1c after removing outliers', fontsize=14, fontweight='bold')
+plt.legend()
+plt.grid(alpha=0.3)
+plt.savefig("visualization/BMI_vs_HbA1c_after_outliers.png", dpi=300, bbox_inches='tight')
+plt.show()
+
+#from the plot we can see that the Y class (diabetes= yes) often has BMI>25 and Age>50
+
+#######################################Scatter plots after removing outliers#######################################
 
 #now scaling
 scaler=MinMaxScaler()
@@ -156,9 +285,27 @@ df_cleaned[num_col].describe()
 
 df_cleaned[num_col].hist(bins=20, figsize=(15,10))
 plt.suptitle("Histogram of Scaled Features")
+plt.savefig("visualization/Histogram_scaled_features.png", dpi=300, bbox_inches='tight')
 plt.show()
 
 plt.figure(figsize=(12,8))
 sns.heatmap(df_cleaned[num_col].corr(method='spearman'), annot=True, cmap='coolwarm')
 plt.title("Correlation Heatmap of Scaled Features")
+plt.savefig("visualization/Correlation_heatmap_scaled_features.png", dpi=300, bbox_inches='tight')
 plt.show()
+
+
+#data splitting
+# Target column (the original version before one-hot encoding)
+y = df_cleaned['CLASS_original']
+
+# Feature set (numerical + encoded gender)
+X = df_cleaned[num_col]
+
+# Train-test split
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+print("Training data shape:", X_train.shape)
+print("Testing data shape:", X_test.shape)
