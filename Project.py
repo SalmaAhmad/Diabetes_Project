@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from apyori import apriori
 import pyfpgrowth
+from sklearn.model_selection import train_test_split
 
 
 
@@ -241,3 +242,19 @@ sns.heatmap(df_cleaned[num_col].corr(method='spearman'), annot=True, cmap='coolw
 plt.title("Correlation Heatmap of Scaled Features")
 plt.savefig("visualization/Correlation_heatmap_scaled_features.png", dpi=300, bbox_inches='tight')
 plt.show()
+
+
+#data splitting
+# Target column (the original version before one-hot encoding)
+y = df_cleaned['CLASS_original']
+
+# Feature set (numerical + encoded gender)
+X = df_cleaned[num_col]
+
+# Train-test split
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+print("Training data shape:", X_train.shape)
+print("Testing data shape:", X_test.shape)
