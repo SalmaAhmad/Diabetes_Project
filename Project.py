@@ -86,11 +86,11 @@ df_cleaned.loc[:, num_col] = imputed_values
 #######################################
 
 # Define bins and labels
-bins = [0, 13, 20, 60, 90]  # Child: 0–12, Teenager: 13–19, Adult: 20–59, Senior: 60–89
+age_bins = [0, 13, 20, 60, 90]  # Child: 0–12, Teenager: 13–19, Adult: 20–59, Senior: 60–89
 labels = ['Child', 'Teenager', 'Adult', 'Senior']
 
 # Apply binning on the original AGE column
-df_cleaned['Age_bin'] = pd.cut(df_cleaned['AGE'], bins=bins, labels=labels, right=False)
+df_cleaned['Age_bin'] = pd.cut(df_cleaned['AGE'], bins=age_bins, labels=labels, right=False)
 
 # BMI Binning
 bmi_bins = [0, 18.5, 25, 30, 100]
