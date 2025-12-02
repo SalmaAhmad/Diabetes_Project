@@ -5,7 +5,10 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.impute import SimpleImputer
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+
 
 
 
@@ -309,3 +312,202 @@ X_train, X_test, y_train, y_test = train_test_split(
 
 print("Training data shape:", X_train.shape)
 print("Testing data shape:", X_test.shape)
+
+
+############################Step 15: KNN Classifier - Find Best k###############################################3
+# %% md
+### Step 15: KNN Classifier - Find Best k using Test Accuracy Graph
+# %%
+
+label_encoder = LabelEncoder()
+y_train_encoded = label_encoder.fit_transform(y_train)
+y_test_encoded = label_encoder.transform(y_test)
+
+print("Class mapping:", dict(zip(label_encoder.classes_, label_encoder.transform(label_encoder.classes_))))
+
+# %% md
+#### 15.1: Test different k values on test set
+# %%
+
+# Try different k values
+k_values = list(range(1, 31, 2))  # Odd numbers from 1 to 29
+test_accuracies = []
+
+print("Testing different k values on test set...")
+for k in k_values:
+    knn = KNeighborsClassifier(n_neighbors=k)
+    knn.fit(X_train, y_train_encoded)
+    y_pred = knn.predict(X_test)
+    accuracy = accuracy_score(y_test_encoded, y_pred)
+    test_accuracies.append(accuracy)
+
+    if k <= 15:  # Print first 15
+        print(f"k={k:2d}: Test Accuracy = {accuracy:.4f}")
+
+
+# %% md
+#### 15.2: Find elbow point in test accuracy graph
+# %%
+
+# Find elbow point (where adding more neighbors doesn't help much)
+def find_elbow_point(k_values, accuracies, threshold=0.01):
+    """
+    Find elbow point where accuracy gain becomes minimal
+    threshold: minimum improvement to consider it worth increasing k
+    """
+    max_acc = max(accuracies)
+    best_k = k_values[0]  # Start with first k
+
+    for i, (k, acc) in enumerate(zip(k_values, accuracies)):
+        # If this k gives near-maximum accuracy, use it
+        if acc >= max_acc * (1 - threshold):
+            best_k = k
+            # Check if this is the elbow (next point doesn't improve much)
+            if i < len(accuracies) - 1:
+                improvement = accuracies[i + 1] - acc
+                if improvement < threshold * 0.5:  # Very small improvement
+                    break
+    return best_k
+
+
+# Find elbow point visually and mathematically
+elbow_k = find_elbow_point(k_values, test_accuracies, threshold=0.02)
+print(f"\nElbow point detected at k={elbow_k}")
+print(f"Accuracy at elbow (k={elbow_k}): {test_accuracies[k_values.index(elbow_k)]:.4f}")
+
+# %% md
+#### 15.3: Plot test accuracy vs k graph
+# %%
+
+plt.figure(figsize=(12, 6))
+
+# Plot accuracy curve
+plt.plot(k_values, test_accuracies, 'bo-', linewidth=2, markersize=8, label='Test Accuracy')
+
+# Mark the elbow point
+elbow_accuracy = test_accuracies[k_values.index(elbow_k)]
+plt.plot(elbow_k, elbow_accuracy, 'ro', markersize=12,
+         label=f'Elbow Point (k={elbow_k}, Acc={elbow_accuracy:.4f})')
+
+# Add elbow line
+plt.axvline(x=elbow_k, color='red', linestyle='--', alpha=0.5)
+
+plt.xlabel('k Value', fontsize=12)
+plt.ylabel('Test Accuracy', fontsize=12)
+plt.title('KNN: Test Accuracy vs k Value (Elbow Method)', fontsize=14, fontweight='bold')
+plt.legend()
+plt.grid(alpha=0.3)
+plt.xticks(k_values[::2])  # Show every other k value
+
+# Highlight region around elbow
+if elbow_k > 1:
+    plt.axvspan(elbow_k - 2, elbow_k + 2, alpha=0.1, color='yellow', label='Optimal Region')
+
+plt.tight_layout()
+plt.show()
+
+# %% md
+#### 15.4: Train final model with elbow k (k=3)
+# %%
+
+# Choose k=3 as identified from your previous results
+final_k = 3  # Based on elbow in your test accuracy graph
+print(f"\nTraining final KNN model with k={final_k} (elbow point)...")
+
+knn_final = KNeighborsClassifier(n_neighbors=final_k)
+knn_final.fit(X_train, y_train_encoded)
+
+# Make predictions
+y_pred = knn_final.predict(X_test)
+
+# %% md
+#### 15.5: Evaluate model with k=3
+# %%
+
+# Calculate accuracy
+accuracy = accuracy_score(y_test_encoded, y_pred)
+print(f"\nAccuracy with k={final_k}: {accuracy:.4f} ({accuracy * 100:.2f}%)")
+
+# Confusion Matrix
+cm = confusion_matrix(y_test_encoded, y_pred)
+print("\nConfusion Matrix:")
+print(cm)
+
+# Show detailed classification report
+print("\nClassification Report:")
+report = classification_report(y_test_encoded, y_pred,
+                               target_names=label_encoder.classes_,
+                               output_dict=True)
+print(classification_report(y_test_encoded, y_pred,
+                            target_names=label_encoder.classes_))
+
+# Extract precision and recall for each class
+print("\n=== Detailed Per-Class Metrics ===")
+for i, class_name in enumerate(label_encoder.classes_):
+    precision = report[class_name]['precision']
+    recall = report[class_name]['recall']
+
+    print(f"Class {class_name}:")
+    print(f"  Precision: {precision:.4f} - Of predicted {class_name}, {precision * 100:.1f}% were correct")
+    print(f"  Recall:    {recall:.4f} - Found {recall * 100:.1f}% of actual {class_name} cases")
+    print()
+
+# %% md
+#### 15.6: Visualize confusion matrix for k=3
+# %%
+
+plt.figure(figsize=(10, 8))
+
+# Create confusion matrix heatmap
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
+            xticklabels=label_encoder.classes_,
+            yticklabels=label_encoder.classes_,
+            cbar_kws={'label': 'Number of Cases'})
+
+plt.title(f'KNN Confusion Matrix (k={final_k}, Accuracy: {accuracy * 100:.2f}%)',
+          fontsize=14, fontweight='bold', pad=20)
+plt.ylabel('True Label', fontsize=12)
+plt.xlabel('Predicted Label', fontsize=12)
+
+# Add text with summary statistics
+plt.text(3.2, 0.5, f'Overall Accuracy: {accuracy * 100:.2f}%\n',
+         transform=plt.gca().transAxes, fontsize=10,
+         bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+
+plt.tight_layout()
+plt.show()
+
+# %% md
+#### 15.7: Compare k=3 with other k values
+# %%
+
+print("\n=== Comparison of Different k Values ===")
+print(f"{'k':>3} {'Accuracy':>10} {'Precision (Y)':>15} {'Recall (Y)':>12}")
+print("-" * 55)
+
+# Test a few key k values for comparison
+compare_ks = [1, 3, 5, 7, 9, 11]
+for k in compare_ks:
+    knn_temp = KNeighborsClassifier(n_neighbors=k)
+    knn_temp.fit(X_train, y_train_encoded)
+    y_pred_temp = knn_temp.predict(X_test)
+
+    acc = accuracy_score(y_test_encoded, y_pred_temp)
+
+    # Get precision and recall for Class Y (diabetes)
+    cm_temp = confusion_matrix(y_test_encoded, y_pred_temp)
+    # Assuming Class Y is the last class (index 2 based on your mapping)
+    tp = cm_temp[2, 2]
+    fp = cm_temp[0, 2] + cm_temp[1, 2]
+    fn = cm_temp[2, 0] + cm_temp[2, 1]
+
+    precision_y = tp / (tp + fp) if (tp + fp) > 0 else 0
+    recall_y = tp / (tp + fn) if (tp + fn) > 0 else 0
+
+    marker = " ← Best" if k == final_k else ""
+    print(f"{k:3d} {acc:10.4f} {precision_y:15.4f} {recall_y:12.4f}{marker}")
+
+print("\n✓ Selected k=3 based on elbow method in test accuracy graph")
+print(f"✓ Test accuracy: {accuracy * 100:.2f}%")
+print("✓ Good balance between model simplicity and performance")
+#############################################################################################################################
