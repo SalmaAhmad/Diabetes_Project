@@ -389,9 +389,69 @@ print(f"Best predicted class: {classes[np.argmax(class_acc)]} ({np.max(class_acc
 print(f"Worst predicted class: {classes[np.argmin(class_acc)]} ({np.min(class_acc):.3f})")
 print(f"Error rate: {error_rate:.3f}")
 
-print("\n" + "="*60)
-print("VISUALIZATIONS SAVED:")
-print("="*60)
-print("1. NaiveBayes_Overall_Metrics.png - Accuracy, Precision, Recall")
-print("2. NaiveBayes_Confusion_Matrix.png - Confusion matrix")
-print("3. NaiveBayes_PerClass_Accuracy.png - Accuracy per class")
+
+# ============================================================================
+# 8. SAVE MODEL FOR GUI AND LAUNCH OPTION
+# ============================================================================
+
+import pickle
+import os
+import warnings
+
+warnings.filterwarnings('ignore')  # Suppress warnings in GUI
+
+print("\n" + "=" * 60)
+print("SAVING MODEL FOR GUI")
+print("=" * 60)
+
+# Save the trained model
+with open('naive_bayes_model.pkl', 'wb') as f:
+    pickle.dump(nb_model, f)
+print("✓ Model saved as 'naive_bayes_model.pkl'")
+
+# Save the scaler
+with open('scaler.pkl', 'wb') as f:
+    pickle.dump(scaler, f)
+print("✓ Scaler saved as 'scaler.pkl'")
+
+# Save test data WITH feature names
+# Convert X_test back to DataFrame with column names
+X_test_df = pd.DataFrame(X_test, columns=num_col)
+y_test_series = pd.Series(y_test, name='CLASS')
+
+X_test_df.to_csv('X_test.csv', index=False)
+y_test_series.to_csv('y_test.csv', index=False)
+print("✓ Test data saved as 'X_test.csv' and 'y_test.csv'")
+
+# Also save feature names for reference
+with open('feature_names.pkl', 'wb') as f:
+    pickle.dump(list(num_col), f)
+print("✓ Feature names saved as 'feature_names.pkl'")
+
+# ============================================================================
+# 9. LAUNCH GUI
+# ============================================================================
+
+print("\n" + "=" * 60)
+print("LAUNCHING GUI")
+print("=" * 60)
+
+
+try:
+    from naive_bayes_gui import run_gui
+
+    # Ensure X_train has feature names for GUI display
+    X_train_df = pd.DataFrame(X_train, columns=num_col)
+
+    print("\n🚀 Launching GUI...")
+    run_gui(nb_model, X_train_df, y_train, X_test_df, y_test_series, scaler, num_col)
+
+except ImportError as e:
+    print(f"\n⚠️ Could not launch GUI: {e}")
+    print("Make sure naive_bayes_gui.py is in the same directory.")
+except Exception as e:
+    print(f"\n⚠️ Error launching GUI: {e}")
+    print("Troubleshooting steps:")
+    print("1. Check all required files exist in directory")
+    print("2. Make sure naive_bayes_gui.py is in same folder")
+    print("3. Run command: pip install pandas numpy scikit-learn matplotlib seaborn")
