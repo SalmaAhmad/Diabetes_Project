@@ -268,11 +268,6 @@ print("Testing data shape:", X_test.shape)
 
 
 
-from sklearn.naive_bayes import GaussianNB
-from sklearn.metrics import confusion_matrix, accuracy_score, precision_score, recall_score
-import matplotlib.pyplot as plt
-import seaborn as sns
-import numpy as np
 
 # ============================================================================
 # 1. NAIVE BAYES MODEL TRAINING
