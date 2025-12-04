@@ -10,6 +10,10 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
 
 
+from sklearn.naive_bayes import GaussianNB
+from sklearn.metrics import confusion_matrix, classification_report, accuracy_score, precision_score, recall_score, f1_score
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 
 df=pd.read_csv("Dataset_Diabetes.csv")
@@ -462,3 +466,197 @@ print("✓ Good balance between model simplicity and performance")
 
 ######################################################################################################
 
+
+
+
+
+
+
+
+
+# ============================================================================
+# 1. NAIVE BAYES MODEL TRAINING
+# ============================================================================
+
+# Initialize and train model
+nb_model = GaussianNB(priors=None, var_smoothing=1e-9)
+print("="*60)
+print("TRAINING NAIVE BAYES MODEL")
+print("="*60)
+nb_model.fit(X_train, y_train)
+
+# Make predictions
+y_test_pred = nb_model.predict(X_test)
+
+# ============================================================================
+# 2. BASIC METRICS
+# ============================================================================
+
+accuracy = accuracy_score(y_test, y_test_pred)
+precision = precision_score(y_test, y_test_pred, average='weighted')
+recall = recall_score(y_test, y_test_pred, average='weighted')
+
+print(f"\nOverall Model Metrics:")
+print(f"Accuracy:  {accuracy:.3f} ({accuracy*100:.1f}%)")
+print(f"Precision: {precision:.3f}")
+print(f"Recall:    {recall:.3f}")
+
+# ============================================================================
+# 3. METRICS VISUALIZATION FOR WHOLE MODEL
+# ============================================================================
+
+plt.figure(figsize=(6, 4))
+metrics = ['Accuracy', 'Precision', 'Recall']
+values = [accuracy, precision, recall]
+colors = ['green', 'blue', 'orange']
+
+bars = plt.bar(metrics, values, color=colors, edgecolor='black', alpha=0.7)
+plt.ylabel('Score')
+plt.title('Naive Bayes: Overall Model Metrics', fontsize=12, fontweight='bold')
+plt.ylim([0, 1.1])
+
+# Add value labels on bars
+for bar, value in zip(bars, values):
+    height = bar.get_height()
+    plt.text(bar.get_x() + bar.get_width()/2., height + 0.02,
+             f'{value:.3f}', ha='center', va='bottom')
+
+plt.grid(alpha=0.3, axis='y')
+plt.tight_layout()
+plt.savefig("visualization/NaiveBayes_Overall_Metrics.png", dpi=300)
+plt.show()
+
+# ============================================================================
+# 4. CONFUSION MATRIX
+# ============================================================================
+
+classes = ['N', 'P', 'Y']
+cm = confusion_matrix(y_test, y_test_pred, labels=classes)
+
+plt.figure(figsize=(6, 5))
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
+            xticklabels=classes, yticklabels=classes)
+plt.title('Naive Bayes - Confusion Matrix')
+plt.xlabel('Predicted')
+plt.ylabel('Actual')
+plt.tight_layout()
+plt.savefig("visualization/NaiveBayes_Confusion_Matrix.png", dpi=300)
+plt.show()
+
+# ============================================================================
+# 5. PER-CLASS ACCURACY
+# ============================================================================
+
+print("\n" + "="*60)
+print("PER-CLASS ACCURACY")
+print("="*60)
+
+# Calculate from confusion matrix
+class_acc = np.diag(cm) / cm.sum(axis=1)
+
+for i, cls in enumerate(classes):
+    print(f"Class {cls}: {class_acc[i]:.3f} ({class_acc[i]*100:.1f}%)")
+
+# Simple bar chart
+plt.figure(figsize=(5, 4))
+plt.bar(classes, class_acc, color=['blue', 'orange', 'red'], alpha=0.7)
+plt.ylim(0, 1.1)
+plt.ylabel('Accuracy')
+plt.title('Naive Bayes: Accuracy per Class')
+plt.grid(alpha=0.3, axis='y')
+plt.tight_layout()
+plt.savefig("visualization/NaiveBayes_PerClass_Accuracy.png", dpi=300)
+plt.show()
+
+# ============================================================================
+# 6. MISCLASSIFIED SAMPLES
+# ============================================================================
+
+print("\n" + "="*60)
+print("MISCLASSIFICATION SUMMARY")
+print("="*60)
+
+misclassified = sum(y_test != y_test_pred)
+error_rate = misclassified / len(y_test)
+print(f"Misclassified samples: {misclassified}/{len(y_test)}")
+print(f"Error rate: {error_rate:.3f} ({error_rate*100:.1f}%)")
+
+# ============================================================================
+# 7. FINAL SUMMARY
+# ============================================================================
+
+print("\n" + "="*60)
+print("NAIVE BAYES - FINAL SUMMARY")
+print("="*60)
+print(f"Model: Gaussian Naive Bayes")
+print(f"Overall Accuracy: {accuracy:.3f}")
+print(f"Best predicted class: {classes[np.argmax(class_acc)]} ({np.max(class_acc):.3f})")
+print(f"Worst predicted class: {classes[np.argmin(class_acc)]} ({np.min(class_acc):.3f})")
+print(f"Error rate: {error_rate:.3f}")
+
+
+# ============================================================================
+# 8. SAVE MODEL FOR GUI AND LAUNCH OPTION
+# ============================================================================
+
+import pickle
+import os
+import warnings
+
+warnings.filterwarnings('ignore')  # Suppress warnings in GUI
+
+print("\n" + "=" * 60)
+print("SAVING MODEL FOR GUI")
+print("=" * 60)
+
+# Save the trained model
+with open('naive_bayes_model.pkl', 'wb') as f:
+    pickle.dump(nb_model, f)
+print("✓ Model saved as 'naive_bayes_model.pkl'")
+
+# Save the scaler
+with open('scaler.pkl', 'wb') as f:
+    pickle.dump(scaler, f)
+print("✓ Scaler saved as 'scaler.pkl'")
+
+# Save test data WITH feature names
+# Convert X_test back to DataFrame with column names
+X_test_df = pd.DataFrame(X_test, columns=num_col)
+y_test_series = pd.Series(y_test, name='CLASS')
+
+X_test_df.to_csv('X_test.csv', index=False)
+y_test_series.to_csv('y_test.csv', index=False)
+print("✓ Test data saved as 'X_test.csv' and 'y_test.csv'")
+
+# Also save feature names for reference
+with open('feature_names.pkl', 'wb') as f:
+    pickle.dump(list(num_col), f)
+print("✓ Feature names saved as 'feature_names.pkl'")
+
+# ============================================================================
+# 9. LAUNCH GUI
+# ============================================================================
+
+print("\n" + "=" * 60)
+print("LAUNCHING GUI")
+print("=" * 60)
+
+
+try:
+    from naive_bayes_gui import run_gui
+
+    # Ensure X_train has feature names for GUI display
+    X_train_df = pd.DataFrame(X_train, columns=num_col)
+
+    print("\n🚀 Launching GUI...")
+    run_gui(nb_model, X_train_df, y_train, X_test_df, y_test_series, scaler, num_col)
+
+except ImportError as e:
+    print(f"\n⚠️ Could not launch GUI: {e}")
+    print("Make sure naive_bayes_gui.py is in the same directory.")
+except Exception as e:
+    print(f"\n⚠️ Error launching GUI: {e}")
+    print("Troubleshooting steps:")
+    print("1. Check all required files exist in directory")
+    print("2. Make sure naive_bayes_gui.py is in same folder")
+    print("3. Run command: pip install pandas numpy scikit-learn matplotlib seaborn")
