@@ -266,6 +266,7 @@ print("Testing data shape:", X_test.shape)
 
 
 
+
 print("\n" + "="*60)
 print("DECISION TREE IMPLEMENTATION")
 print("="*60)
@@ -277,7 +278,6 @@ clf = DecisionTreeClassifier(
     min_samples_leaf=10,
     class_weight={'N': 3, 'P': 2, 'Y': 1}
 )
-
 
 clf.fit(X_train, y_train)
 
@@ -313,64 +313,37 @@ print("="*60)
 # Confusion Matrix
 cm = confusion_matrix(y_test, y_pred, labels=['N', 'P', 'Y'])
 
-# Debug: Check actual confusion matrix values
-print(f"\n=== DEBUG: Actual Confusion Matrix Values ===")
-print(f"Test set size: {len(y_test)}")
-print(f"Confusion matrix shape: {cm.shape}")
-print(f"Confusion matrix:\n{cm}")
+print(f"\nTest set size: {len(y_test)}")
 print(f"Class distribution in test set:")
 print(y_test.value_counts().sort_index())
 
 print("\n" + "="*50)
-print("CONFUSION MATRIX (Formatted)")
+print("CONFUSION MATRIX")
 print("="*50)
 
-# Display formatted confusion matrix
+# Simple matrix display
 print("\n                Predicted")
-print("               ┌─────┬─────┬─────┐")
-print("               │  N  │  P  │  Y  │")
-print("               ├─────┼─────┼─────┤")
-
-# Print rows with proper formatting
-for i, true_label in enumerate(['N', 'P', 'Y']):
-    if i == 0:
-        print(f"Actual   N: │ {cm[0,0]:3d} │ {cm[0,1]:3d} │ {cm[0,2]:3d} │")
-    elif i == 1:
-        print(f"Actual   P: │ {cm[1,0]:3d} │ {cm[1,1]:3d} │ {cm[1,2]:3d} │")
-    else:
-        print(f"Actual   Y: │ {cm[2,0]:3d} │ {cm[2,1]:3d} │ {cm[2,2]:3d} │")
-        print("               └─────┴─────┴─────┘")
-
-print("\nKey:")
-print("N = Normal, P = Prediabetes, Y = Diabetes")
-print("Rows = True/Actual class")
-print("Columns = Predicted class")
-
-# Calculate accuracy manually from confusion matrix
-total = cm.sum()
-correct = np.diag(cm).sum()
-accuracy_manual = correct / total
-
-print(f"\nFrom confusion matrix:")
-print(f"Total samples: {total}")
-print(f"Correct predictions: {correct}")
-print(f"Accuracy: {accuracy_manual:.4f} ({accuracy_manual*100:.2f}%)")
-
-# Verify accuracy matches
-print(f"\nVerification: accuracy_score = {accuracy:.4f}, manual calculation = {accuracy_manual:.4f}")
-print(f"Match: {abs(accuracy - accuracy_manual) < 0.0001}")
+print("                 N     P     Y")
+print("Actual N:  {:5d} {:5d} {:5d}".format(cm[0,0], cm[0,1], cm[0,2]))
+print("        P:  {:5d} {:5d} {:5d}".format(cm[1,0], cm[1,1], cm[1,2]))
+print("        Y:  {:5d} {:5d} {:5d}".format(cm[2,0], cm[2,1], cm[2,2]))
+print("\nKey: N = Normal, P = Prediabetes, Y = Diabetes")
 
 # Classification Report
 print("\n" + "="*50)
 print("CLASSIFICATION REPORT")
 print("="*50)
+
+# Generate report and store it
 report = classification_report(y_test, y_pred,
                                target_names=['N', 'P', 'Y'],
                                output_dict=True)
+
+# Print the formatted report
 print(classification_report(y_test, y_pred, target_names=['N', 'P', 'Y']))
 
-# Extract precision and recall for each class
 print("\n=== Detailed Per-Class Metrics ===")
+# Extract from the already-generated report
 for class_name in ['N', 'P', 'Y']:
     precision = report[class_name]['precision']
     recall = report[class_name]['recall']
@@ -385,28 +358,23 @@ for class_name in ['N', 'P', 'Y']:
 
 # Visualize confusion matrix
 plt.figure(figsize=(10, 8))
-
-# Create heatmap with actual values
 ax = sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
                  xticklabels=['N', 'P', 'Y'],
                  yticklabels=['N', 'P', 'Y'],
                  cbar_kws={'label': 'Number of Cases'},
                  annot_kws={"size": 14, "weight": "bold"})
 
-# Customize title and labels
 plt.title(f'Decision Tree Confusion Matrix\nAccuracy: {accuracy*100:.2f}%',
           fontsize=16, fontweight='bold', pad=20)
 plt.ylabel('True Label', fontsize=14, fontweight='bold')
 plt.xlabel('Predicted Label', fontsize=14, fontweight='bold')
 
-# Add custom annotations for errors
+# Highlight misclassifications with red borders instead of redundant text
 for i in range(3):
     for j in range(3):
-        if i != j and cm[i, j] > 0:  # Highlight misclassifications
-            ax.text(j + 0.5, i + 0.5, f'{cm[i, j]}',
-                    ha='center', va='center',
-                    fontweight='bold', color='red',
-                    fontsize=14)
+        if i != j and cm[i, j] > 0:
+            ax.add_patch(plt.Rectangle((j, i), 1, 1, fill=False,
+                                       edgecolor='red', lw=2))
 
 plt.tight_layout()
 plt.savefig("visualization/decision_tree_confusion_matrix_ACTUAL.png",
@@ -417,65 +385,27 @@ print("\n" + "="*60)
 print("ADDITIONAL METRICS CALCULATION")
 print("="*60)
 
-# Calculate metrics for each class
-print("\n=== Detailed Metrics Calculation ===")
+# Calculate specificity and other metrics from confusion matrix
+print("\n=== Specificity and Error Analysis ===")
 
-# For Class N
-tn_n = cm[1,1] + cm[1,2] + cm[2,1] + cm[2,2]
-fp_n = cm[0,1] + cm[0,2]
-fn_n = cm[1,0] + cm[2,0]
-tp_n = cm[0,0]
+# For each class, calculate specificity (True Negative )
+classes = ['N', 'P', 'Y']
+for idx, class_name in enumerate(classes):
+    # True negatives: sum of all elements except row and column of current class
+    tn = cm.sum() - (cm[idx, :].sum() + cm[:, idx].sum() - cm[idx, idx])
+    # False positives: sum of column except the diagonal
+    fp = cm[:, idx].sum() - cm[idx, idx]
 
-precision_n = tp_n / (tp_n + fp_n) if (tp_n + fp_n) > 0 else 0
-recall_n = tp_n / (tp_n + fn_n) if (tp_n + fn_n) > 0 else 0
-specificity_n = tn_n / (tn_n + fp_n) if (tn_n + fp_n) > 0 else 0
+    specificity = tn / (tn + fp) if (tn + fp) > 0 else 0
 
-print(f"\nClass N (Normal):")
-print(f"  True Positives: {tp_n}")
-print(f"  False Positives: {fp_n}")
-print(f"  True Negatives: {tn_n}")
-print(f"  False Negatives: {fn_n}")
-print(f"  Precision: {precision_n:.4f}")
-print(f"  Recall: {recall_n:.4f}")
-print(f"  Specificity: {specificity_n:.4f}")
+    print(f"\nClass {class_name}:")
+    print(f"  Specificity: {specificity:.4f} - Correctly identified {specificity*100:.1f}% of non-{class_name} cases")
 
-# For Class P
-tn_p = cm[0,0] + cm[0,2] + cm[2,0] + cm[2,2]
-fp_p = cm[1,0] + cm[1,2]
-fn_p = cm[0,1] + cm[2,1]
-tp_p = cm[1,1]
-
-precision_p = tp_p / (tp_p + fp_p) if (tp_p + fp_p) > 0 else 0
-recall_p = tp_p / (tp_p + fn_p) if (tp_p + fn_p) > 0 else 0
-specificity_p = tn_p / (tn_p + fp_p) if (tn_p + fp_p) > 0 else 0
-
-print(f"\nClass P (Prediabetes):")
-print(f"  True Positives: {tp_p}")
-print(f"  False Positives: {fp_p}")
-print(f"  True Negatives: {tn_p}")
-print(f"  False Negatives: {fn_p}")
-print(f"  Precision: {precision_p:.4f}")
-print(f"  Recall: {recall_p:.4f}")
-print(f"  Specificity: {specificity_p:.4f}")
-
-# For Class Y
-tn_y = cm[0,0] + cm[0,1] + cm[1,0] + cm[1,1]
-fp_y = cm[2,0] + cm[2,1]
-fn_y = cm[0,2] + cm[1,2]
-tp_y = cm[2,2]
-
-precision_y = tp_y / (tp_y + fp_y) if (tp_y + fp_y) > 0 else 0
-recall_y = tp_y / (tp_y + fn_y) if (tp_y + fn_y) > 0 else 0
-specificity_y = tn_y / (tn_y + fp_y) if (tn_y + fp_y) > 0 else 0
-
-print(f"\nClass Y (Diabetes):")
-print(f"  True Positives: {tp_y}")
-print(f"  False Positives: {fp_y}")
-print(f"  True Negatives: {tn_y}")
-print(f"  False Negatives: {fn_y}")
-print(f"  Precision: {precision_y:.4f}")
-print(f"  Recall: {recall_y:.4f}")
-print(f"  Specificity: {specificity_y:.4f}")
+    # Error rates
+    false_positive_rate = fp / (fp + tn) if (fp + tn) > 0 else 0
+    false_negative_rate = report[class_name]['recall']  # 1 - recall is miss rate
+    print(f"  False Positive Rate: {false_positive_rate:.4f}")
+    print(f"  False Negative Rate: {1 - report[class_name]['recall']:.4f}")
 
 # Feature Importance
 print("\n" + "="*60)
