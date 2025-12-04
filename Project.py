@@ -65,6 +65,9 @@ outlier_mask = (df[num_col] < (q1 - 1.5 * iqr)) | (df[num_col] > (q3 + 1.5 * iqr
 outlier_counts = outlier_mask.sum()
 print(outlier_counts)
 
+# Get global min and max from the original (before cleaning) DataFrame
+ymin = df[num_col].min().min() -5
+ymax = df[num_col].max().max() + 5
 
 #visualizing the outliers
 
