@@ -121,16 +121,6 @@ df_cleaned['Age_Kbins'] = pd.cut(df_cleaned['AGE'],
                                   bins=bin_edges,
                                   labels=age_labels,
                                   right=False)
-
-# Keep your other binning as is
-#bmi_bins = [0, 18.5, 25, 30, 100]
-#bmi_labels = ['Underweight', 'Normal', 'Overweight', 'Obese']
-#df_cleaned['BMI_bin'] = pd.cut(df_cleaned['BMI'], bins=bmi_bins, labels=bmi_labels, right=False)
-
-#hba1c_bins = [0, 4.0, 5.7, 6.4, 100]
-#hba1c_labels = ['Very Low', 'Normal', 'Prediabetes', 'Diabetes']
-#df_cleaned['HbA1c_bin'] = pd.cut(df_cleaned['HbA1c'], bins=hba1c_bins, labels=hba1c_labels, right=False)
-
 # Show results
 print(f"\nK={K} Equal-Width Age Binning:")
 print(f"Age range: {min_age} to {max_age}")
@@ -315,9 +305,10 @@ print("Testing data shape:", X_test.shape)
 
 
 ############################Step 15: KNN Classifier - Find Best k###############################################3
-# %% md
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+from sklearn.neighbors import KNeighborsClassifier
+
 ### Step 15: KNN Classifier - Find Best k using Test Accuracy Graph
-# %%
 
 label_encoder = LabelEncoder()
 y_train_encoded = label_encoder.fit_transform(y_train)
@@ -325,9 +316,7 @@ y_test_encoded = label_encoder.transform(y_test)
 
 print("Class mapping:", dict(zip(label_encoder.classes_, label_encoder.transform(label_encoder.classes_))))
 
-# %% md
 #### 15.1: Test different k values on test set
-# %%
 
 # Try different k values
 k_values = list(range(1, 31, 2))  # Odd numbers from 1 to 29
@@ -344,53 +333,56 @@ for k in k_values:
     if k <= 15:  # Print first 15
         print(f"k={k:2d}: Test Accuracy = {accuracy:.4f}")
 
-
-# %% md
-#### 15.2: Find elbow point in test accuracy graph
-# %%
+#### 15.2: Find elbow point in test accuracy graph (excluding k=1)
 
 # Find elbow point (where adding more neighbors doesn't help much)
-def find_elbow_point(k_values, accuracies, threshold=0.01):
+# Exclude k=1 from being considered as elbow point
+def find_elbow_point_excluding_k1(k_values, accuracies, threshold=0.01):
     """
     Find elbow point where accuracy gain becomes minimal
+    Excludes k=1 from being selected as the elbow
     threshold: minimum improvement to consider it worth increasing k
     """
-    max_acc = max(accuracies)
-    best_k = k_values[0]  # Start with first k
+    # Find max accuracy excluding k=1
+    acc_without_k1 = accuracies[1:]  # Exclude k=1
+    max_acc = max(acc_without_k1)
 
-    for i, (k, acc) in enumerate(zip(k_values, accuracies)):
-        # If this k gives near-maximum accuracy, use it
+    # Start from k=3 (index 1 in k_values since k_values[0]=1, k_values[1]=3)
+    for i in range(1, len(k_values)):  # Start from index 1 (k=3)
+        k = k_values[i]
+        acc = accuracies[i]
+
+        # If this k gives near-maximum accuracy, check if it's the elbow
         if acc >= max_acc * (1 - threshold):
-            best_k = k
             # Check if this is the elbow (next point doesn't improve much)
             if i < len(accuracies) - 1:
                 improvement = accuracies[i + 1] - acc
                 if improvement < threshold * 0.5:  # Very small improvement
-                    break
-    return best_k
+                    return k
+    # If no clear elbow found, return k=3 as default
+    return k_values[1]  # k=3
 
-
-# Find elbow point visually and mathematically
-elbow_k = find_elbow_point(k_values, test_accuracies, threshold=0.02)
-print(f"\nElbow point detected at k={elbow_k}")
+# Find elbow point excluding k=1
+elbow_k = find_elbow_point_excluding_k1(k_values, test_accuracies, threshold=0.02)
+print(f"\nElbow point detected at k={elbow_k} (k=1 excluded)")
 print(f"Accuracy at elbow (k={elbow_k}): {test_accuracies[k_values.index(elbow_k)]:.4f}")
 
-# %% md
-#### 15.3: Plot test accuracy vs k graph
-# %%
+#### 15.3: Plot test accuracy vs k graph (without vertical line)
 
 plt.figure(figsize=(12, 6))
 
 # Plot accuracy curve
 plt.plot(k_values, test_accuracies, 'bo-', linewidth=2, markersize=8, label='Test Accuracy')
 
-# Mark the elbow point
-elbow_accuracy = test_accuracies[k_values.index(elbow_k)]
-plt.plot(elbow_k, elbow_accuracy, 'ro', markersize=12,
-         label=f'Elbow Point (k={elbow_k}, Acc={elbow_accuracy:.4f})')
+# Mark the elbow point (only if not k=1)
+if elbow_k != 1:
+    elbow_accuracy = test_accuracies[k_values.index(elbow_k)]
+    plt.plot(elbow_k, elbow_accuracy, 'ro', markersize=12,
+             label=f'Elbow Point (k={elbow_k}, Acc={elbow_accuracy:.4f})')
 
-# Add elbow line
-plt.axvline(x=elbow_k, color='red', linestyle='--', alpha=0.5)
+# Highlight region around elbow (if not k=1)
+if elbow_k > 1 and elbow_k < 30:
+    plt.axvspan(elbow_k - 2, elbow_k + 2, alpha=0.1, color='yellow', label='Optimal Region')
 
 plt.xlabel('k Value', fontsize=12)
 plt.ylabel('Test Accuracy', fontsize=12)
@@ -398,20 +390,13 @@ plt.title('KNN: Test Accuracy vs k Value (Elbow Method)', fontsize=14, fontweigh
 plt.legend()
 plt.grid(alpha=0.3)
 plt.xticks(k_values[::2])  # Show every other k value
-
-# Highlight region around elbow
-if elbow_k > 1:
-    plt.axvspan(elbow_k - 2, elbow_k + 2, alpha=0.1, color='yellow', label='Optimal Region')
-
 plt.tight_layout()
 plt.show()
 
-# %% md
 #### 15.4: Train final model with elbow k (k=3)
-# %%
 
-# Choose k=3 as identified from your previous results
-final_k = 3  # Based on elbow in your test accuracy graph
+# Use the elbow k found (which won't be 1)
+final_k = elbow_k
 print(f"\nTraining final KNN model with k={final_k} (elbow point)...")
 
 knn_final = KNeighborsClassifier(n_neighbors=final_k)
@@ -420,9 +405,7 @@ knn_final.fit(X_train, y_train_encoded)
 # Make predictions
 y_pred = knn_final.predict(X_test)
 
-# %% md
-#### 15.5: Evaluate model with k=3
-# %%
+#### 15.5: Evaluate model with elbow k
 
 # Calculate accuracy
 accuracy = accuracy_score(y_test_encoded, y_pred)
@@ -452,9 +435,7 @@ for i, class_name in enumerate(label_encoder.classes_):
     print(f"  Recall:    {recall:.4f} - Found {recall * 100:.1f}% of actual {class_name} cases")
     print()
 
-# %% md
-#### 15.6: Visualize confusion matrix for k=3
-# %%
+#### 15.6: Visualize confusion matrix
 
 plt.figure(figsize=(10, 8))
 
@@ -469,45 +450,12 @@ plt.title(f'KNN Confusion Matrix (k={final_k}, Accuracy: {accuracy * 100:.2f}%)'
 plt.ylabel('True Label', fontsize=12)
 plt.xlabel('Predicted Label', fontsize=12)
 
-# Add text with summary statistics
-plt.text(3.2, 0.5, f'Overall Accuracy: {accuracy * 100:.2f}%\n',
-         transform=plt.gca().transAxes, fontsize=10,
-         bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
-
 plt.tight_layout()
 plt.show()
 
-# %% md
-#### 15.7: Compare k=3 with other k values
-# %%
-
-print("\n=== Comparison of Different k Values ===")
-print(f"{'k':>3} {'Accuracy':>10} {'Precision (Y)':>15} {'Recall (Y)':>12}")
-print("-" * 55)
-
-# Test a few key k values for comparison
-compare_ks = [1, 3, 5, 7, 9, 11]
-for k in compare_ks:
-    knn_temp = KNeighborsClassifier(n_neighbors=k)
-    knn_temp.fit(X_train, y_train_encoded)
-    y_pred_temp = knn_temp.predict(X_test)
-
-    acc = accuracy_score(y_test_encoded, y_pred_temp)
-
-    # Get precision and recall for Class Y (diabetes)
-    cm_temp = confusion_matrix(y_test_encoded, y_pred_temp)
-    # Assuming Class Y is the last class (index 2 based on your mapping)
-    tp = cm_temp[2, 2]
-    fp = cm_temp[0, 2] + cm_temp[1, 2]
-    fn = cm_temp[2, 0] + cm_temp[2, 1]
-
-    precision_y = tp / (tp + fp) if (tp + fp) > 0 else 0
-    recall_y = tp / (tp + fn) if (tp + fn) > 0 else 0
-
-    marker = " ← Best" if k == final_k else ""
-    print(f"{k:3d} {acc:10.4f} {precision_y:15.4f} {recall_y:12.4f}{marker}")
-
-print("\n✓ Selected k=3 based on elbow method in test accuracy graph")
+print(f"\n✓ Selected k={final_k} based on elbow method (k=1 excluded)")
 print(f"✓ Test accuracy: {accuracy * 100:.2f}%")
 print("✓ Good balance between model simplicity and performance")
-#############################################################################################################################
+
+######################################################################################################
+
